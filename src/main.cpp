@@ -67,14 +67,6 @@ NimbleBluetooth *nimbleBluetooth = nullptr;
 #include "SX1280Interface.h"
 #include "detect/LoRaRadioType.h"
 
-#ifdef ARCH_STM32WL
-#include "STM32WLE5JCInterface.h"
-#endif
-
-#if !HAS_RADIO && defined(ARCH_PORTDUINO)
-#include "platform/portduino/SimRadio.h"
-#endif
-
 #if HAS_BUTTON || defined(ARCH_PORTDUINO)
 #include "ButtonThread.h"
 #endif
