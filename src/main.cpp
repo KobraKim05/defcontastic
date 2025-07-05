@@ -258,38 +258,14 @@ void setup()
     powerStatus->observe(&power->newStatus);
     power->setup(); // Must be after status handler is installed, so that handler gets notified of the initial configuration
 
-#if !MESHTASTIC_EXCLUDE_I2C
-    // We need to scan here to decide if we have a screen for nodeDB.init() and because power has been applied to
-    // accessories
+    // TODO: Initialize I2C devices
     auto i2cScanner = std::unique_ptr<ScanI2CTwoWire>(new ScanI2CTwoWire());
-#if HAS_WIRE
-    LOG_INFO("Scanning for i2c devices...\n");
-#endif
 
-#if defined(I2C_SDA1) && !defined(ARCH_RP2040)
-    Wire1.begin(I2C_SDA1, I2C_SCL1);
-    i2cScanner->scanPort(ScanI2C::I2CPort::WIRE1);
-#endif
-
-#if defined(I2C_SDA) && !defined(ARCH_RP2040)
-    Wire.begin(I2C_SDA, I2C_SCL);
-    i2cScanner->scanPort(ScanI2C::I2CPort::WIRE);
-#endif
-
-    auto i2cCount = i2cScanner->countDevices();
-    if (i2cCount == 0) {
-        LOG_INFO("No I2C devices found\n");
-    } else {
-        LOG_INFO("%i I2C devices found\n", i2cCount);
-    }
-
-#ifdef ARCH_ESP32
-    // Don't init display if we don't have one or we are waking headless due to a timer event
+    // Don't init display if we are waking headless due to a timer event
     if (wakeCause == ESP_SLEEP_WAKEUP_TIMER) {
         LOG_DEBUG("suppress screen wake because this is a headless timer wakeup");
         i2cScanner->setSuppressScreen();
     }
-#endif
 
     auto screenInfo = i2cScanner->firstScreen();
     screen_found = screenInfo.type != ScanI2C::DeviceType::NONE ? screenInfo.address : ScanI2C::ADDRESS_NONE;
@@ -309,90 +285,12 @@ void setup()
         }
     }
 
-#define UPDATE_FROM_SCANNER(FIND_FN)
-
     auto rtc_info = i2cScanner->firstRTC();
     rtc_found = rtc_info.type != ScanI2C::DeviceType::NONE ? rtc_info.address : rtc_found;
 
-    auto kb_info = i2cScanner->firstKeyboard();
-
-    if (kb_info.type != ScanI2C::DeviceType::NONE) {
-        cardkb_found = kb_info.address;
-        switch (kb_info.type) {
-        case ScanI2C::DeviceType::RAK14004:
-            kb_model = 0x02;
-            break;
-        case ScanI2C::DeviceType::CARDKB:
-            kb_model = 0x00;
-            break;
-        case ScanI2C::DeviceType::TDECKKB:
-            // assign an arbitrary value to distinguish from other models
-            kb_model = 0x10;
-            break;
-        case ScanI2C::DeviceType::BBQ10KB:
-            // assign an arbitrary value to distinguish from other models
-            kb_model = 0x11;
-            break;
-        default:
-            // use this as default since it's also just zero
-            LOG_WARN("kb_info.type is unknown(0x%02x), setting kb_model=0x00\n", kb_info.type);
-            kb_model = 0x00;
-        }
-    }
-
     pmu_found = i2cScanner->exists(ScanI2C::DeviceType::PMU_AXP192_AXP2101);
 
-/*
- * There are a bunch of sensors that have no further logic than to be found and stuffed into the
- * nodeTelemetrySensorsMap singleton. This wraps that logic in a temporary scope to declare the temporary field
- * "found".
- */
-
-#if !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL)
-    auto acc_info = i2cScanner->firstAccelerometer();
-    accelerometer_found = acc_info.type != ScanI2C::DeviceType::NONE ? acc_info.address : accelerometer_found;
-    LOG_DEBUG("acc_info = %i\n", acc_info.type);
-#endif
-
-#define STRING(S) #S
-
-#define SCANNER_TO_SENSORS_MAP(SCANNER_T, PB_T)                                                                                  \
-    {                                                                                                                            \
-        auto found = i2cScanner->find(SCANNER_T);                                                                                \
-        if (found.type != ScanI2C::DeviceType::NONE) {                                                                           \
-            nodeTelemetrySensorsMap[PB_T].first = found.address.address;                                                         \
-            nodeTelemetrySensorsMap[PB_T].second = i2cScanner->fetchI2CBus(found.address);                                       \
-            LOG_DEBUG("found i2c sensor %s\n", STRING(PB_T));                                                                    \
-        }                                                                                                                        \
-    }
-
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::BME_680, meshtastic_TelemetrySensorType_BME680)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::BME_280, meshtastic_TelemetrySensorType_BME280)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::BMP_280, meshtastic_TelemetrySensorType_BMP280)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::BMP_085, meshtastic_TelemetrySensorType_BMP085)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::INA260, meshtastic_TelemetrySensorType_INA260)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::INA219, meshtastic_TelemetrySensorType_INA219)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::INA3221, meshtastic_TelemetrySensorType_INA3221)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::MCP9808, meshtastic_TelemetrySensorType_MCP9808)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::MCP9808, meshtastic_TelemetrySensorType_MCP9808)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::SHT31, meshtastic_TelemetrySensorType_SHT31)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::SHTC3, meshtastic_TelemetrySensorType_SHTC3)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::LPS22HB, meshtastic_TelemetrySensorType_LPS22)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::QMC6310, meshtastic_TelemetrySensorType_QMC6310)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::QMI8658, meshtastic_TelemetrySensorType_QMI8658)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::QMC5883L, meshtastic_TelemetrySensorType_QMC5883L)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::PMSA0031, meshtastic_TelemetrySensorType_PMSA003I)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::RCWL9620, meshtastic_TelemetrySensorType_RCWL9620)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::VEML7700, meshtastic_TelemetrySensorType_VEML7700)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::TSL2591, meshtastic_TelemetrySensorType_TSL25911FN)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::OPT3001, meshtastic_TelemetrySensorType_OPT3001)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::MLX90632, meshtastic_TelemetrySensorType_MLX90632)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::SHT4X, meshtastic_TelemetrySensorType_SHT4X)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::AHT10, meshtastic_TelemetrySensorType_AHT10)
-    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::DFROBOT_LARK, meshtastic_TelemetrySensorType_DFROBOT_LARK)
-
     i2cScanner.reset();
-#endif
 
     // LED init
 
@@ -434,16 +332,9 @@ void setup()
 
 
 #if !MESHTASTIC_EXCLUDE_I2C
-#if !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL) && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
-    if (acc_info.type != ScanI2C::DeviceType::NONE) {
-        config.display.wake_on_tap_or_motion = true;
-        moduleConfig.external_notification.enabled = true;
-        accelerometerThread = new AccelerometerThread(acc_info.type);
-    }
-#endif
-#endif
-
-#if !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL)
+#if defined(HAS_NEOPIXEL) || defined(UNPHONE) || defined(RGBLED_RED)
+    ambientLightingThread = new AmbientLightingThread(ScanI2C::DeviceType::NONE);
+#elif !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL)
     if (rgb_found.type != ScanI2C::DeviceType::NONE) {
         ambientLightingThread = new AmbientLightingThread(rgb_found.type);
     }
