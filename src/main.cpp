@@ -259,6 +259,9 @@ void setup()
     // TODO: Initialize I2C devices
     auto i2cScanner = std::unique_ptr<ScanI2CTwoWire>(new ScanI2CTwoWire());
 
+    Wire.begin(I2C_SDA, I2C_SCL);
+    i2cScanner->scanPort(ScanI2C::I2CPort::WIRE);
+
     // Don't init display if we are waking headless due to a timer event
     if (wakeCause == ESP_SLEEP_WAKEUP_TIMER) {
         LOG_DEBUG("suppress screen wake because this is a headless timer wakeup");

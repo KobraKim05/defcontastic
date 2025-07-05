@@ -33,7 +33,7 @@ L76K GPS Module Information : https://www.seeedstudio.com/L76K-GNSS-Module-for-S
 #define LED_PIN 48
 #define LED_STATE_ON 1 // State when LED is lit
 
-#define BUTTON_PIN 2 // This is the Program Button
+#define BUTTON_PIN 3 // This is the Program Button
 #define BUTTON_NEED_PULLUP
 
 #define BATTERY_PIN -1
