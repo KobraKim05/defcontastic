@@ -71,7 +71,6 @@ NimbleBluetooth *nimbleBluetooth = nullptr;
 #include "ButtonThread.h"
 #endif
 
-#include "AmbientLightingThread.h"
 #include "PowerFSMThread.h"
 
 #if !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL) && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
@@ -171,7 +170,6 @@ uint32_t timeLastPowered = 0;
 
 static Periodic *ledPeriodic;
 static OSThread *powerFSMthread;
-static OSThread *ambientLightingThread;
 
 RadioInterface *rIf = NULL;
 
@@ -329,16 +327,6 @@ void setup()
     // fixed screen override?
     if (config.display.oled != meshtastic_Config_DisplayConfig_OledType_OLED_AUTO)
         screen_model = config.display.oled;
-
-
-#if !MESHTASTIC_EXCLUDE_I2C
-#if defined(HAS_NEOPIXEL) || defined(UNPHONE) || defined(RGBLED_RED)
-    ambientLightingThread = new AmbientLightingThread(ScanI2C::DeviceType::NONE);
-#elif !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL)
-    if (rgb_found.type != ScanI2C::DeviceType::NONE) {
-        ambientLightingThread = new AmbientLightingThread(rgb_found.type);
-    }
-#endif
 
     // Init our SPI controller (must be before screen and lora)
     initSPI();
